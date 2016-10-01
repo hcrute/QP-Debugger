@@ -1,3 +1,3 @@
 # QP-Debugger
 
-##Project for EE382C-V&V
+Project for EE382C-V&V
