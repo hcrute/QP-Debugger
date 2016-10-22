@@ -1,0 +1,53 @@
+This shows how to understand the raw data sent over the UDP socket given knowledge of the QSpy dict file
+
+The example consists of the output of one transition in both the QSpy command line program and our reciever.py program
+
+Examine the dpp_dict file in this directory in correlation with this file to understand what is happening
+NOTE: the dpp_dict file can be requested by our script by sending a command to qspy, then parsed and read
+(the file is saved where qspy is running from ie: C:\qp\qptools\bin. We may have a command line arg if qspy is running elsewhere)
+
+QSpy command prompt view of transition (data id = 6):
+0000024768 ==>Tran: Obj=l_philo[4] Sig=TIMEOUT_SIG Source=Philo_thinking New=Philo_hungry
+
+UDP packet recieved by our receiver.py file:
+254 6 192 96 0 0 11 0 32 179 64 0 0 0 0 0 208 58 64 0 0 0 0 0 96 55 64 0 0 0 0 0
+
+data of note:
+{11}
+{32, 179, 64}
+{208, 58, 64}
+{96, 55, 64}
+
+NOTE - this is big endian data, MSB for all is 64
+NOTE - these are all obviously seperated by 0s in the message
+NOTE - {254, 6, 192, 96} is a book keeping sequence for QSpy to track messages sent, received, message id etc
+       you can analyze in depth to figure out what specifically is happening if you want, I don't think it's 
+       relevant
+1:
+11 = 0xB = TIMEOUT_SIG (look up in Sig-Dic)
+
+2:
+32    179   64 MSB
+
+0010 0000 1011 0011 0100 0000
+ 2    0    B    3     4   0
+
+40B320 - phil[4] - look in object dictionary
+
+3:
+208 58 64
+
+1101 0000 0011 1010 0100 0000
+  D   0    3   A    4     0
+
+403AD0 - philo_thinking = old state - look  in func dictionary
+
+96 55 64
+
+0110 0000 0011 0111 0100 0000
+  6   0     3   7    4     0
+
+403760 - philo_hungry = new state - look in func dictionary
+
+
+Thus the data we have translates back into TIMEOUT_SIG, philosopher 4, transition from thinking to hungry just like QSpy said
