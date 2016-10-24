@@ -1,0 +1,6 @@
+Here is an early prototype of our system. It only works with "1 deep" states
+It does not monitor the table yet either
+To test use
+python xml_parser.py 5 1
+
+it is not documented well and has many bugs
