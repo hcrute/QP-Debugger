@@ -38,84 +38,6 @@ class qm_class:
         self.name = name.lower()
         self.level = level
         self.diagram = None
-
-
-        
-
-def unpackXML(root):
-    global level
-    global AO_flag
-    global state_flag
-    if root.tag == "state" and state_flag == False:
-        level += 1
-        state_flag = True
-    elif root.tag == "class":
-        level = 0
-        state_flag = False
-    
-    if root.tag in look_for and AO_flag:
-        add_to_object(root)
-    if root.tag == "package":
-        if root.attrib['name'] == "AOs":
-            AO_flag = True
-            
-    nested = False
-    for elem in root.getchildren():
-        if "state" == root.tag and "state" == elem.tag and nested == False:
-            level += 1
-            nested = True
-        unpackXML(elem)
-
-def add_to_object(obj):
-    global class_flag
-    global ret_obj
-    global level
-    global current_class
-    global current_obj
-    global current_state
-    global nested_states
-    
-    if obj.tag == "class":
-        new_class = qm_class(obj.attrib['name'], level)
-        new_class.states = []
-        ret_obj.append(new_class)
-        current_class = new_class
-        current_obj = new_class
-        nested_states = False
-    elif obj.tag == "state":
-        new_state = qm_state(obj.attrib['name'], level)
-        new_state.states = []
-        new_state.trans = []
-        if current_state == None:
-            current_class.states.append(new_state)
-            current_state = new_state
-        elif nested_states == False:
-            if level > current_state.level:
-                current_state.states.append(new_state)
-                current_obj = current_state
-                nested_states = True
-                current_state = new_state
-            else:
-                current_class.states.append(new_state)
-                current_state = new_state
-        else: #add nesting greater than 2 with "previous" pointer
-            if level > current_obj.level:
-                current_obj.states.append(new_state)
-                current_state = new_state
-            else:
-                current_class.states.append(new_state)
-                current_obj = new_state 
-    elif obj.tag == "tran":
-        current_state.trans.append(obj)
-    elif obj.tag == "state_glyph":
-        if(current_state.glyph == None):
-            current_state.glyph = obj
-        else:
-            current_obj.glyph = obj
-    elif obj.tag == "choice_glyph":
-        current_state.choices.append(obj);
-    elif obj.tag == "state_diagram":
-        current_class.diagram = obj;
         
     #debug print
     #if current_class != None and current_obj != None and current_state != None:
@@ -208,7 +130,7 @@ def draw_class(C, w, base_x, base_y, num, list):
         
 class Application(Frame):
     models = []
-    def createWidgets(self, master):
+    def createWidgets(self, master, ret_obj):
         master.geometry('%dx%d+%d+%d' %(1000, 750, 0, 0))
         master.display_frame = Frame(master, width =1000, height = 700 )
         master.display_frame.pack(fill = "both", expand = True)
@@ -234,8 +156,6 @@ class Application(Frame):
         self.models = state_models
         
         self.w = w
-        self.find_gui_state("philo1", "hungry")
-        self.reset_gui_class("philo1", self.models)
         '''
         for model in self.models:
             print model.name
@@ -245,10 +165,10 @@ class Application(Frame):
                     print "     ", m.name
         '''
     
-    def __init__(self, master=None):
+    def __init__(self, ret_obj, master=None):
         Frame.__init__(self, master)
         self.pack()
-        self.createWidgets(master)
+        self.createWidgets(master, ret_obj)
         
     def set_queue(self, queue):
         self.queue = queue
@@ -264,7 +184,7 @@ class Application(Frame):
                     if m.models != None:
                         self.find_states(m, name)
                             
-    def find_states(self, m, name):
+    def find_states(self, m,  name):
         for mo in m.models:
             for s in mo.states:
                 if name in s[0]:
@@ -274,25 +194,27 @@ class Application(Frame):
                     self.find_states(mo, name)
             
             
-    def find_gui_trans(self, C, name):
+    def find_gui_trans(self, C, S, name):
         for model in self.models:
             if C in model.name:
                 for m in model.models:
-                    for t in m.transitions:
-                        if name in t[0]:
-                            self.w.itemconfig(t[1], fill="red")
-                            return
+                    if S in m.name:
+                        for t in m.transitions:
+                            if name in t[0]:
+                                self.w.itemconfig(t[1], fill="red")
+                                
                     if m.models != None:
-                        self.find_trans(m, name)
+                        self.find_trans(m, S, name)
                             
-    def find_trans(self, m, name):
+    def find_trans(self, m, S, name):
         for mo in m.models:
-            for t in mo.transitions:
-                if name in t[0]:
-                    self.w.itemconfig(t[1], fill="red")
-                    return
-                if mo.models != None:
-                    self.find_trans(mo, name)
+            if S in mo.name:
+                for t in mo.transitions:
+                    if name in t[0]:
+                        self.w.itemconfig(t[1], fill="red")
+                        
+                    if mo.models != None:
+                        self.find_trans(mo, S, name)
                     
     
     def reset_gui_class(self, class_name, models):
@@ -335,6 +257,8 @@ class Application(Frame):
                 msg_new = msg[3].split('_')[1]
                 self.reset_gui_class(msg_class+num, self.models)
                 self.find_gui_state(msg_class+num, msg_new.lower())
+                print msg_class+num, ', ', msg_old, ', ', msg_trig
+                self.find_gui_trans(msg_class+num, msg_old, msg_trig.split('_')[0].lower())
             except Queue.Empty:
                 pass
                 
@@ -379,7 +303,7 @@ class ThreadedClient:
             # some cleanup before actually shutting it down.
             import sys
             sys.exit(1)
-        self.master.after(100, self.periodicCall)
+        self.master.after(10, self.periodicCall)
 
     def workerThread1(self):
         """
@@ -397,35 +321,117 @@ class ThreadedClient:
 
     def endApplication(self):
         self.running = 0
+ 
+
+class qp_debug:
+    def __init__(self, AO_COUNT):
+        self.level = 0
+        self.AO_flag = False
+        self.look_for = ["class", "state", "tran", "state_glyph", "choice_glyph", "state_diagram"]
+        self.ret_obj = []
+        self.current_class = None
+        self.current_obj = None
+        self.current_state = None
+        self.state_flag = False
+        self.nested_states = False
+
+        tree = ET.parse('Practice.qm')
+        root = tree.getroot()
+        self.unpackXML(root)
+        root = Tk()
+        app = Application(self.ret_obj, master=root)
+
+        rand = random.Random()
+
+        client = ThreadedClient(root, app)
+        app.mainloop()
+        try:
+            root.destroy()
+        except:
+            pass
+            
+    def unpackXML(self, root):
+        if root.tag == "state" and self.state_flag == False:
+            self.level += 1
+            self.state_flag = True
+        elif root.tag == "class":
+            self.level = 0
+            self.state_flag = False
         
-level = 0
-AO_flag = False
-look_for = ["class", "state", "tran", "state_glyph", "choice_glyph", "state_diagram"]
-ret_obj = []
-current_class = None
-current_obj = None
-current_state = None
-state_flag = False
-nested_states = False
+        if root.tag in self.look_for and self.AO_flag:
+            self.add_to_object(root)
+        if root.tag == "package":
+            if root.attrib['name'] == "AOs":
+                self.AO_flag = True
+                
+        nested = False
+        for elem in root.getchildren():
+            if "state" == root.tag and "state" == elem.tag and nested == False:
+                self.level += 1
+                nested = True
+            self.unpackXML(elem)
+
+    def add_to_object(self, obj):
+        global level
+        global current_class
+        global current_obj
+        global current_state
+        global nested_states
+        
+        if obj.tag == "class":
+            new_class = qm_class(obj.attrib['name'], self.level)
+            new_class.states = []
+            self.ret_obj.append(new_class)
+            self.current_class = new_class
+            self.current_obj = new_class
+            self.nested_states = False
+        elif obj.tag == "state":
+            new_state = qm_state(obj.attrib['name'], self.level)
+            new_state.states = []
+            new_state.trans = []
+            if self.current_state == None:
+                self.current_class.states.append(new_state)
+                self.current_state = new_state
+            elif self.nested_states == False:
+                if self.level > self.current_state.level:
+                    self.current_state.states.append(new_state)
+                    self.current_obj = self.current_state
+                    self.nested_states = True
+                    self.current_state = new_state
+                else:
+                    self.current_class.states.append(new_state)
+                    self.current_state = new_state
+            else: #add nesting greater than 2 with "previous" pointer
+                if self.level > self.current_obj.level:
+                    self.current_obj.states.append(new_state)
+                    self.current_state = new_state
+                else:
+                    self.current_class.states.append(new_state)
+                    self.current_obj = new_state 
+        elif obj.tag == "tran":
+            self.current_state.trans.append(obj)
+        elif obj.tag == "state_glyph":
+            if(self.current_state.glyph == None):
+                self.current_state.glyph = obj
+            else:
+                self.current_obj.glyph = obj
+        elif obj.tag == "choice_glyph":
+            self.current_state.choices.append(obj);
+        elif obj.tag == "state_diagram":
+            self.current_class.diagram = obj;
+            
+            
+            
+            
+            
+            
+            
 AO_COUNT = []
 if len(sys.argv) > 0:
     for arg in sys.argv:
         AO_COUNT.append(arg)
 
-tree = ET.parse('Practice.qm')
-root = tree.getroot()
-unpackXML(root)
-root = Tk()
-app = Application(master=root)
-
-rand = random.Random()
-
-client = ThreadedClient(root, app)
-app.mainloop()
-try:
-    root.destroy()
-except:
-    pass
+qp = qp_debug(AO_COUNT)
 '''
 ret_obj - list of qm_class objects
 qm_class    
