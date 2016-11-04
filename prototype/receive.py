@@ -42,12 +42,14 @@ class msg_analyzer:
                 string = ""
                 flag = False
                 line = ""
-                parsed = [[],[],[],[],[]]
+                parsed = [[],[],[],[]]
                 index = 0
                 out_of_bounds_flag = False
+                j = 0
                 for d in data:
+                    
                     line = line + str(d) + ' '
-                    if d != 0 :
+                    if d != 0 and j > 5:
                         if index < len(parsed):
                             parsed[index].append(d)
                         else:
@@ -61,11 +63,12 @@ class msg_analyzer:
                             #print string
                         flag = False
                         #string = ""
+                    j = j + 1
                 #print string 
                 #print parsed[0]
+                #print parsed[1]
                 row_index = 0
                 data = []
-                flag = False
                 for parse in parsed:
                     total = 0
                     index = 0
@@ -75,10 +78,8 @@ class msg_analyzer:
                         total = total + (pow(16, 2*index)*parsed[row_index][index])
                         index = index +1
                     row_index = row_index + 1
-                    if flag:
-                        data.append(hex(total))
-                    else:
-                        flag = True
+                    data.append(hex(total))
+                    
                 if not out_of_bounds_flag:
                     string = ""
                     string = string + self.compare_msg(data[1], 0) + " "
@@ -97,9 +98,9 @@ class msg_analyzer:
             for data in self.dict.funcs:
                 if data[0].lower() == msg:
                     return data[len(data)-1]
+                    
         elif index == 2:
             for data in self.dict.sigs:
                 if data[0].lower() == msg:
                     return data[len(data)-1]
                 
-
